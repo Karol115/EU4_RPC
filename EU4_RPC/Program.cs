@@ -1,4 +1,6 @@
-﻿namespace EU4_RPC
+﻿using System.Diagnostics;
+
+namespace EU4_RPC
 {
     internal class Program
     {
@@ -46,8 +48,8 @@
                 rpc.UpdateDiscordPresence(saveGameDict);
                 while (true)
                 {
-                    /*if (Process.GetProcessesByName("eu4").Length == 0)
-                        break;*/
+                    if (Process.GetProcessesByName("eu4").Length == 0)
+                        break;
 
                     rpc.discord.RunCallbacks();
                     Thread.Sleep(3000);
