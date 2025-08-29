@@ -44,21 +44,38 @@ namespace EU4_RPC
                         Console.WriteLine(item.Key + ": " + i);
                     }
                 }*/
-
-                rpc.UpdateDiscordPresence(saveGameDict);
-                while (true)
-                {
-                    /*if (Process.GetProcessesByName("eu4").Length == 0)
-                        break;*/
-
-                    rpc.discord.RunCallbacks();
-                    Thread.Sleep(3000);
-                }
             }
-            catch (Exception e) {
+            catch (Exception e)
+            {
                 Console.WriteLine("Main: " + e);
-                Console.ReadKey();
             }
+
+
+            while (true)
+            {
+                try
+                {
+                    if (rpc.discord != null)
+                    {
+                        rpc.discord.RunCallbacks();
+                        /*if (Process.GetProcessesByName("eu4").Length == 0)
+                        break;*/
+                    }
+                    else
+                    {
+                        rpc.Initialize();
+                    }
+                }
+                catch (Discord.ResultException)
+                {
+                    Console.WriteLine("Discord client not detected #1. Retrying in 10 seconds...");
+                    rpc.Initialize();
+                    Thread.Sleep(5000);
+                }
+
+                Thread.Sleep(5000);
+            }
+            Console.ReadKey();
         }
 
         private static void OnSaveChanged(object sender, FileSystemEventArgs e)

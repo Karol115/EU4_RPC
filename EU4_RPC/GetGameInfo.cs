@@ -27,6 +27,8 @@
             //read first lines
             int linesScanned = 0;
             int maxLinesScanned = 500;
+            long startPosition = 0;
+            int braceCount = 0;
 
             using (StreamReader reader = new StreamReader(filePath))
             {
@@ -64,20 +66,21 @@
                     }
                     linesScanned++;
                 }
-            }
 
-            //read government rank
-            using (StreamReader reader = new StreamReader(filePath))
-            {
-                long startPosition = reader.BaseStream.Length * 1 / 4;
-                reader.BaseStream.Seek(startPosition, SeekOrigin.Begin);
+
+                string playerTag = gameData["player"][0];
+
+
+                //                                          read government rank
+                //startPosition = reader.BaseStream.Length * 1 / 4;
+                //reader.BaseStream.Seek(startPosition, SeekOrigin.Begin);
 
                 bool inCountriesBlock = false;
                 bool inCountryBlock = false;
-                bool inCorrectSection = false;
-                int braceCount = 0;
+                bool[] inCorrectSection = {false, false};
+                braceCount = 0;
 
-                string line;
+
                 while ((line = reader.ReadLine()) != null)
                 {
                     line = line.Trim();
@@ -89,51 +92,55 @@
                         continue;
                     }
 
-                    if (line.StartsWith(gameData["player"][0] + "={"))
+                    if (inCountriesBlock && line.StartsWith(playerTag + "={"))
                     {
                         inCountryBlock = true;
                         braceCount = 1;
                         continue;
                     }
 
-                    if (line.StartsWith("was_player=yes"))
+                    if (inCountryBlock)
                     {
-                        inCorrectSection = true;
-                        braceCount = 1;
-                        continue;
-                    }
-
-                    if (inCorrectSection)
-                    {
-                        braceCount += line.Count(c => c == '{');
-                        braceCount -= line.Count(c => c == '}');
-
-                        if (line.StartsWith("government_rank="))
+                        if (line.StartsWith("human=yes"))
                         {
-                            int.TryParse(line.Split('=')[1], out int rankNum);
-                            string rank = ((GovernmentRank)rankNum).ToString();
-                            Console.WriteLine($"Government rank: {rank}");
-                            gameData.Add("government_rank", new List<string> { rank });
+                            inCorrectSection[0] = true;
+                            braceCount = 1;
+                            continue;
                         }
 
-                        if (braceCount == 0)
-                            break;
+                        if (inCorrectSection[0] && line.StartsWith("was_player=yes"))
+                        {
+                            inCorrectSection[1] = true;
+                            braceCount = 1;
+                            continue;
+                        }
+
+                        if (inCorrectSection[0] && inCorrectSection[1])
+                        {
+                            braceCount += line.Count(c => c == '{');
+                            braceCount -= line.Count(c => c == '}');
+
+                            if (line.StartsWith("government_rank="))
+                            {
+                                int.TryParse(line.Split('=')[1], out int rankNum);
+                                string rank = ((GovernmentRank)rankNum).ToString();
+                                gameData.Add("government_rank", new List<string> { rank });
+                                break;
+                            }
+                        }
                     }
+                    linesScanned++;
                 }
-            }
+            
 
-            //read last lines
-            using (StreamReader reader = new StreamReader(filePath))
-            {
-                long startPosition = reader.BaseStream.Length * 3 / 4;
+                //                                          read last lines(active wars)
+                startPosition = reader.BaseStream.Length * 3 / 4;
                 reader.BaseStream.Seek(startPosition, SeekOrigin.Begin);
+                braceCount = 0;
 
-                string playerTag = gameData["player"][0];
                 bool inActiveWar = false;
-                int braceCount = 0;
                 bool foundPlayer = false;
 
-                string line;
                 while ((line = reader.ReadLine()) != null)
                 {
                     //Console.WriteLine(reader.BaseStream.Position);
