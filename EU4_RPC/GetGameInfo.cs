@@ -2,6 +2,14 @@
 {
     public static class GetGameInfo
     {
+        enum GovernmentRank
+        {
+            None = 0,
+            Duchy = 1,
+            Kingdom = 2,
+            Empire = 3,
+        }
+
         private static List<string> list = new List<string>
         {
             "date",
@@ -55,6 +63,62 @@
                         }
                     }
                     linesScanned++;
+                }
+            }
+
+            //read government rank
+            using (StreamReader reader = new StreamReader(filePath))
+            {
+                long startPosition = reader.BaseStream.Length * 1 / 4;
+                reader.BaseStream.Seek(startPosition, SeekOrigin.Begin);
+
+                bool inCountriesBlock = false;
+                bool inCountryBlock = false;
+                bool inCorrectSection = false;
+                int braceCount = 0;
+
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    line = line.Trim();
+
+                    if (line.StartsWith("countries={"))
+                    {
+                        inCountriesBlock = true;
+                        braceCount = 1;
+                        continue;
+                    }
+
+                    if (line.StartsWith(gameData["player"][0] + "={"))
+                    {
+                        inCountryBlock = true;
+                        braceCount = 1;
+                        continue;
+                    }
+
+                    if (line.StartsWith("was_player=yes"))
+                    {
+                        inCorrectSection = true;
+                        braceCount = 1;
+                        continue;
+                    }
+
+                    if (inCorrectSection)
+                    {
+                        braceCount += line.Count(c => c == '{');
+                        braceCount -= line.Count(c => c == '}');
+
+                        if (line.StartsWith("government_rank="))
+                        {
+                            int.TryParse(line.Split('=')[1], out int rankNum);
+                            string rank = ((GovernmentRank)rankNum).ToString();
+                            Console.WriteLine($"Government rank: {rank}");
+                            gameData.Add("government_rank", new List<string> { rank });
+                        }
+
+                        if (braceCount == 0)
+                            break;
+                    }
                 }
             }
 
