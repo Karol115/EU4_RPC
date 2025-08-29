@@ -25,6 +25,9 @@ namespace EU4_RPC
 
         static void Main(string[] args)
         {
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            Console.WriteLine("Copyright \u00A9 2023-2025 Karol115 All rights reserved.");
+
             try
             {
                 saveGameDict = GetGameInfo.ReadSaveGame(autosaveFilePath);
