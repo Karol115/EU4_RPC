@@ -19,6 +19,9 @@ mono_crash.*
 # Build results
 EU4_RPC - Copy/
 /Game SDK/
+/icon.ico
+/icon.svg
+/icon.png
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/

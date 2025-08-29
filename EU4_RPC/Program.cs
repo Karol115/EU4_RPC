@@ -48,8 +48,8 @@ namespace EU4_RPC
                 rpc.UpdateDiscordPresence(saveGameDict);
                 while (true)
                 {
-                    if (Process.GetProcessesByName("eu4").Length == 0)
-                        break;
+                    /*if (Process.GetProcessesByName("eu4").Length == 0)
+                        break;*/
 
                     rpc.discord.RunCallbacks();
                     Thread.Sleep(3000);
