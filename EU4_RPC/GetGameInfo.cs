@@ -133,6 +133,7 @@
                 }
             
 
+# Region "This is the code to be collapsed"
                 //                                          read last lines(active wars)
                 startPosition = reader.BaseStream.Length * 3 / 4;
                 reader.BaseStream.Seek(startPosition, SeekOrigin.Begin);
