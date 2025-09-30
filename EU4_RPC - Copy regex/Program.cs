@@ -2,7 +2,6 @@
 
 namespace EU4_RPC
 {
-
     internal class Program
     {
         /*public static string DecompressFile(string filePath)
@@ -23,8 +22,6 @@ namespace EU4_RPC
         public static Dictionary<string, List<string>> saveGameDict;
         private static FileSystemWatcher fileWatcher;
         private static RPC rpc;
-
-        private static Timer debounceTimer;
 
         static void Main(string[] args)
         {
@@ -61,16 +58,26 @@ namespace EU4_RPC
             {
                 try
                 {
-                    rpc.discord?.RunCallbacks();
+                    if (rpc.discord != null)
+                    {
+                        rpc.discord.RunCallbacks();
+
+                        /*if (Process.GetProcessesByName("eu4").Length == 0)
+                            break;*/
+                    }
+                    else
+                    {
+                        rpc.Initialize();
+                    }
                 }
-                catch (Exception)
+                catch (Discord.ResultException)
                 {
                     Console.WriteLine("Discord client not detected #1. Retrying in 10 seconds...");
-                    Thread.Sleep(9000);
                     rpc.Initialize();
+                    Thread.Sleep(5000);
                 }
 
-                Thread.Sleep(1000);
+                Thread.Sleep(5000);
             }
             Console.ReadKey();
         }
@@ -79,35 +86,33 @@ namespace EU4_RPC
         {
             Console.WriteLine($"File {e.Name} changed. Updating...");
             int attempts = 0;
-            const int maxAttempts = 20;
+            const int maxAttempts = 50;
             const int delayMs = 2000;
 
-            debounceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-
-            debounceTimer = new Timer(_ =>
+            while (attempts < maxAttempts)
             {
-                attempts++;
-
                 try
                 {
-                    Console.WriteLine("Updating Discord presence...");
+                    fileWatcher.EnableRaisingEvents = false;
                     rpc.UpdateDiscordPresence(GetGameInfo.ReadSaveGame(autosaveFilePath));
+                    break;
                 }
                 catch (IOException ex)
                 {
-                    Console.WriteLine("Error reading file: " + ex.Message);
-                    if (attempts < maxAttempts)
-                    {
-                        //try again
-                        debounceTimer?.Change(delayMs, Timeout.Infinite);
-                    }
-                    else
-                    {
-                        //end
-                        debounceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-                    }
+                    Console.WriteLine($"{attempts}: Error File Access: {ex.Message}. Try {attempts + 1}/{maxAttempts}. Waiting...");
+                    attempts++;
+                    Thread.Sleep(delayMs);
                 }
-            }, null, 500, Timeout.Infinite);
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Something went wrong: {ex.Message}");
+                    break;
+                }
+                finally
+                {
+                    fileWatcher.EnableRaisingEvents = true;
+                }
+            }
         }
 
     }
