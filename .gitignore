@@ -19,6 +19,7 @@ mono_crash.*
 # Build results
 EU4_RPC - Copy/
 EU4_RPC - Copy (2)/
+EU4_RPC - Copy regex/
 /Game SDK/
 /icon.ico
 /icon.svg
