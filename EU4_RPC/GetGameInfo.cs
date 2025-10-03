@@ -1,5 +1,4 @@
-﻿using System.IO;
-
+﻿
 namespace EU4_RPC
 {
     public static class GetGameInfo
@@ -127,6 +126,8 @@ namespace EU4_RPC
                             }
                             break;
                     }
+
+                    linesScanned++;
                 }
 
                 Done:;
@@ -186,13 +187,15 @@ namespace EU4_RPC
                         if (line.StartsWith("previous_war"))
                             break;
                     }
+
+                    linesScanned++;
                 }
                 #endregion
             }
 
 
             #region draw lines + lines count
-            Console.WriteLine("Scaned lines: " + linesScanned.ToString());
+            Console.WriteLine("Scaned lines: " + linesScanned.ToString("#,0", System.Globalization.CultureInfo.InvariantCulture).Replace(",", "."));
             Console.WriteLine();
             foreach (var line in gameData)
             {

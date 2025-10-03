@@ -18,6 +18,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="AboutConsoleDLL">
+      <HintPath>..\..\AAA-DLL\AboutConsoleDLL\AboutConsoleDLL\bin\Release\netstandard2.0\AboutConsoleDLL.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="discord_game_sdk.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
