@@ -24,6 +24,9 @@ namespace EU4_RPC
         private static RPC rpc;
 
         private static Timer debounceTimer;
+        private static int attempts = 0;
+        const int maxAttempts = 20;
+        const int delayMs = 2000;
 
         static void Main(string[] args)
         {
@@ -39,8 +42,10 @@ namespace EU4_RPC
                 fileWatcher = new FileSystemWatcher(saveGamePath);
 
                 fileWatcher.Filter = "autosave.eu4";
-                fileWatcher.NotifyFilter = NotifyFilters.LastWrite;
+                fileWatcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName;
                 fileWatcher.Changed += OnSaveChanged;
+                fileWatcher.Created += OnSaveChanged;
+                fileWatcher.Renamed += OnSaveChanged;
                 fileWatcher.EnableRaisingEvents = true;
 
                 /*foreach (var item in saveGameDict)
@@ -78,36 +83,32 @@ namespace EU4_RPC
         private static void OnSaveChanged(object sender, FileSystemEventArgs e)
         {
             Console.WriteLine($"File {e.Name} changed. Updating...");
-            int attempts = 0;
-            const int maxAttempts = 20;
-            const int delayMs = 2000;
+            attempts = 0;
 
-            debounceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-
-            debounceTimer = new Timer(_ =>
+            debounceTimer ??= new Timer(_ =>
             {
-                attempts++;
-
                 try
                 {
                     Console.WriteLine("Updating Discord presence...");
                     rpc.UpdateDiscordPresence(GetGameInfo.ReadSaveGame(autosaveFilePath));
+                    debounceTimer.Change(Timeout.Infinite, Timeout.Infinite);
                 }
                 catch (IOException ex)
                 {
+                    attempts++;
                     Console.WriteLine("Error reading file: " + ex.Message);
                     if (attempts < maxAttempts)
                     {
-                        //try again
-                        debounceTimer?.Change(delayMs, Timeout.Infinite);
+                        debounceTimer.Change(delayMs, Timeout.Infinite);
                     }
                     else
                     {
-                        //end
-                        debounceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                        debounceTimer.Change(Timeout.Infinite, Timeout.Infinite);
                     }
                 }
-            }, null, 500, Timeout.Infinite);
+            }, null, Timeout.Infinite, Timeout.Infinite);
+
+            debounceTimer.Change(500, Timeout.Infinite);
         }
 
     }
