@@ -8,9 +8,11 @@ namespace EU4_RPC
         public Discord.Discord discord;
 
         private const long clientId = 1409886197303476258;
+        private long startTimestamp;
 
         public RPC()
         {
+            startTimestamp = DateTimeOffset.Now.ToUnixTimeSeconds();
             Initialize();
         }
 
@@ -70,15 +72,17 @@ namespace EU4_RPC
 
                     State = "By Karol115",
                     Details = $"Playing as:{governmentRank} {countryName} {atWar}| Year: {date} | {age} | {ruler}",
-                    /*Timestamps =
+
+                    Timestamps =
                     {
-                        Start = DateTimeOffset.Now.ToUnixTimeSeconds()
-                    },*/
+                        Start = startTimestamp
+                    },
+
                     Assets =
-                {
-                    LargeImage = "eu4_logo-512",
-                    LargeText = "eu4"
-                }
+                    {
+                        LargeImage = "eu4_logo-512",
+                        LargeText = "eu4"
+                    }
                 };
 
                 activityManager.UpdateActivity(activity, (Result result) =>
