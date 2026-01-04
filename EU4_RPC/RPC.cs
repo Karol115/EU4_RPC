@@ -62,7 +62,8 @@ namespace EU4_RPC
                 {
                     var count = gameData["at_war"].Count;
                     atWar = "at war with " + gameData["at_war"][0];
-                    if (count > 1) atWar += " and " + (count - 1) + " other(s) ";
+                    if (count > 1) atWar += " and " + (count - 1) + " other(s)";
+                    atWar += " ";
                 }
 
 

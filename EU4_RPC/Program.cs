@@ -77,7 +77,6 @@ namespace EU4_RPC
 
                 Thread.Sleep(1000);
             }
-            Console.ReadKey();
         }
 
         private static void OnSaveChanged(object sender, FileSystemEventArgs e)

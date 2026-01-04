@@ -204,7 +204,7 @@ namespace EU4_RPC
             }
             Console.WriteLine();
             #endregion
-
+            
             return gameData;
         }
     }
