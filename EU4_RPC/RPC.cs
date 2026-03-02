@@ -18,20 +18,28 @@ namespace EU4_RPC
 
         public void Initialize()
         {
-            while (discord == null)
+            if (discord != null) return;
+
+            try
             {
-                try
+                discord = new Discord.Discord(clientId, (UInt64)Discord.CreateFlags.NoRequireDiscord);
+
+                /*discord.SetLogHook(Discord.LogLevel.Error, (level, message) =>
                 {
-                    discord = new Discord.Discord(clientId, (UInt64)Discord.CreateFlags.NoRequireDiscord);
-                }
-                catch (Discord.ResultException)
-                {
-                    Console.WriteLine("Discord client not detected #2. Retrying in 10 seconds...");
-                    Thread.Sleep(10000);
-                }
+                    Console.WriteLine($"Discord Error: {message}");
+                });*/
+
+                UpdateDiscordPresence(Program.saveGameDict);
+
+            }
+            catch (Discord.ResultException)
+            {
+                Console.WriteLine("Discord client not detected #2. Retrying in 10 seconds...");
+                discord = null;
+                //Thread.Sleep(10000);
             }
 
-            UpdateDiscordPresence(Program.saveGameDict);
+            //UpdateDiscordPresence(Program.saveGameDict);
         }
 
         public bool UpdateDiscordPresence(Dictionary<string, List<string>> gameData)
@@ -55,35 +63,37 @@ namespace EU4_RPC
                 string countryName = GetValue("displayed_country_name", "Unknown Country");
                 string age = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(GetValue("current_age"));
                 string ruler = GetValue("king_name", "Unknown Ruler");
-                string governmentRank = !string.IsNullOrEmpty(GetValue("government_rank")) ? " " + GetValue("government_rank") + " of" : "";
+                string governmentRank = !string.IsNullOrEmpty(GetValue("government_rank")) ? (" " + GetValue("government_rank") + " of") : "";
 
-                string atWar = "";
+                string atWarDisplay = "";
                 if (gameData.ContainsKey("at_war") && gameData["at_war"].Count > 0)
                 {
                     var count = gameData["at_war"].Count;
-                    atWar = "at war with " + gameData["at_war"][0];
-                    if (count > 1) atWar += " and " + (count - 1) + " other(s)";
-                    atWar += " ";
+                    var enemy = gameData["at_war"][0];
+                    var others = count > 1 ? $" + {count - 1}" : "";
+                    atWarDisplay = $" | ⚔️ {enemy} {others}";
                 }
 
+				string playerTag = GetValue("player");
+                string flagAsset = CountriesWithFlag.Contains(playerTag) ? playerTag : "eu4_logo-512";
 
-                var activity = new Discord.Activity
+				var activity = new Discord.Activity
                 {
-                    Type = ActivityType.Playing,
+					Type = ActivityType.Playing,
 
-                    State = "By Karol115",
-                    Details = $"Playing as:{governmentRank} {countryName} {atWar}| Year: {date} | {age} | {ruler}",
+					State = "By Karol115",
 
-                    Timestamps =
-                    {
-                        Start = startTimestamp
-                    },
+					Details = $"{governmentRank} {countryName} {atWarDisplay}| Year: {date} | {age} | {ruler}",
 
-                    Assets =
+					Timestamps = { Start = startTimestamp },
+
+					Assets =
                     {
                         LargeImage = "eu4_logo-512",
-                        LargeText = "eu4"
-                    }
+                        //SmallImage = flagAsset,
+                        LargeText = countryName,
+						SmallText = "Europa Universalis IV"
+					}
                 };
 
                 activityManager.UpdateActivity(activity, (Result result) =>
@@ -107,5 +117,26 @@ namespace EU4_RPC
                 return false;
             }
         }
+
+        private readonly HashSet<string> CountriesWithFlag = new()
+        {
+            // --- EUROPE ---
+			"ARA", "AUT", "BAV", "BOH", "BRA", "BUR", "BYZ", "CAS", "DAN", "ENG",
+	        "FRA", "GBR", "GER", "HAB", "HLR", "HUN", "ITA", "LAN", "LIT", "LVA",
+	        "MLO", "MOS", "NAP", "NED", "NOR", "NOV", "PAP", "PLC", "POL", "POR",
+	        "PRU", "ROM", "RUS", "SAX", "SCO", "SPA", "SWE", "TEU",
+
+            // --- ASIA ---
+            "BAH", "DLH", "JAP", "MNG", "MUG", "PER", "QNG", "TIM", "VIJ",
+
+            // --- AFRICA ---
+            "ADU", "EGY", "ETH", "MAM", "MOR", "TUN",
+
+            // --- AMERICA ---
+            "BRZ", "CAN", "USA",
+
+            // --- OTHER ---
+            "TUR"
+		};
     }
 }

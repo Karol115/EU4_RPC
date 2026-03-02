@@ -53,10 +53,10 @@ namespace EU4_RPC
 
                 while ((line = reader.ReadLine()) != null && linesScanned <= maxLinesScanned)
                 {
-                    line = line.Trim();
+					if (string.IsNullOrWhiteSpace(line)) continue;
 
-                    if (line.StartsWith("key=\"longest_reign\""))
-                    {
+					if (line.IndexOf("key=\"longest_reign\"", StringComparison.Ordinal) >= 0)
+					{
                         string next = reader.ReadLine()?.Trim();
                         if (next != null && next.StartsWith("localization="))
                         {
@@ -91,12 +91,13 @@ namespace EU4_RPC
                 State state = State.Outside;
                 startPosition = reader.BaseStream.Length * 1 / 4;
                 reader.BaseStream.Seek(startPosition, SeekOrigin.Begin);
+                reader.DiscardBufferedData();
 
                 while ((line = reader.ReadLine()) != null)
-                {
-                    line = line.Trim();
+                { 
+					string trimmedLine = line.Trim();
 
-                    switch (state)
+				    switch (state)
                     {
                         case State.Outside:
                             if (line.StartsWith("countries={"))
@@ -104,28 +105,32 @@ namespace EU4_RPC
                             break;
 
                         case State.InCountries:
-                            if (line.StartsWith(playerTag + "={"))
-                                state = State.InPlayerCountry;
+							if (trimmedLine.StartsWith(playerTag + "={"))
+								state = State.InPlayerCountry;
                             break;
 
                         case State.InPlayerCountry:
-                            if (line.StartsWith("human=yes"))
-                                state = State.FoundHuman;
-                            break;
+							if (trimmedLine.Contains("human=yes"))
+								state = State.FoundHuman;
 
-                        case State.FoundHuman:
-                            if (line.StartsWith("government_rank="))
-                            {
-                                var parts = line.Split('=');
-                                if (parts.Length > 1 && int.TryParse(parts[1], out int rankNum))
+							if (trimmedLine == "}") state = State.InCountries;
+							break;
+
+						case State.FoundHuman:
+							if (trimmedLine.StartsWith("government_rank="))
+							{
+								var parts = trimmedLine.Split('=');
+								if (parts.Length > 1 && int.TryParse(parts[1], out int rankNum))
                                 {
                                     string rank = ((GovernmentRank)rankNum).ToString();
                                     gameData["government_rank"].Add(rank);
                                     goto Done;
                                 }
                             }
-                            break;
-                    }
+
+							if (trimmedLine == "}") state = State.InCountries;
+							break;
+					}
 
                     linesScanned++;
                 }
@@ -136,14 +141,14 @@ namespace EU4_RPC
                 #region active wars
                 startPosition = reader.BaseStream.Length * 3 / 4;
                 reader.BaseStream.Seek(startPosition, SeekOrigin.Begin);
+                reader.DiscardBufferedData();
+
                 bool inActiveWar = false;
                 List<string> blockLines = new();
 
                 while ((line = reader.ReadLine()) != null)
                 {
-                    line = line.Trim();
-
-                    if (line.StartsWith("active_war={"))
+                    if(line.Contains("active_war={", StringComparison.Ordinal))
                     {
                         inActiveWar = true;
                         blockLines.Clear();
@@ -152,8 +157,8 @@ namespace EU4_RPC
 
                     if (inActiveWar)
                     {
-                        if (line.StartsWith("battle={")) // end of at war countries list
-                        {
+						if (line.Trim().StartsWith("battle={")) // end of at war countries list
+						{
                             inActiveWar = false;
 
                             var attackers = new List<string>();
@@ -162,9 +167,15 @@ namespace EU4_RPC
                             foreach (var l in blockLines)
                             {
                                 if (l.StartsWith("add_attacker="))
-                                    attackers.Add(l.Split('"')[1]);
+                                {
+                                    var parts = l.Split('"');
+                                    if(parts.Length > 1) attackers.Add(parts[1]);
+                                }
                                 else if (l.StartsWith("add_defender="))
-                                    defenders.Add(l.Split('"')[1]);
+                                {
+                                    var parts = l.Split('"');
+                                    if(parts.Length > 1) defenders.Add(parts[1]);
+                                }
                             }
 
                             if (attackers.Contains(playerTag) || defenders.Contains(playerTag))

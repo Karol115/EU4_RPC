@@ -1,4 +1,6 @@
 ﻿using AboutConsoleDLL;
+using System.Diagnostics.Metrics;
+using System.Security.Authentication.ExtendedProtection;
 
 namespace EU4_RPC
 {
@@ -30,8 +32,6 @@ namespace EU4_RPC
 
         static void Main(string[] args)
         {
-            /*Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.WriteLine("Copyright \u00A9 2023-2025 Karol115 All rights reserved.");*/
             About.ShowAbout(System.Reflection.Assembly.GetExecutingAssembly());
 
             try
@@ -61,21 +61,29 @@ namespace EU4_RPC
                 Console.WriteLine("Main: " + e);
             }
 
-
-            while (true)
+			int counter = 0;
+			while (true)
             {
-                try
+                if (rpc.discord != null)
                 {
-                    rpc.discord?.RunCallbacks();
-                }
-                catch (Exception)
+                    try
+                    {
+                        rpc.discord?.RunCallbacks();
+                    }
+                    catch (Exception)
+                    {
+                        Console.WriteLine("Discord client not detected #1. Retrying in 10 seconds...");
+                        rpc.discord.Dispose();
+                        rpc.discord = null;
+                    }
+                } 
+                else
                 {
-                    Console.WriteLine("Discord client not detected #1. Retrying in 10 seconds...");
-                    Thread.Sleep(9000);
-                    rpc.Initialize();
-                }
+					if (counter % 100 == 0) rpc.Initialize();
+				}
 
-                Thread.Sleep(1000);
+                counter++;
+                Thread.Sleep(100);
             }
         }
 
