@@ -1,4 +1,6 @@
 ﻿
+using System;
+
 namespace EU4_RPC
 {
     public static class GetGameInfo
@@ -11,13 +13,13 @@ namespace EU4_RPC
             Empire = 3,
         }
 
-        enum State
+        /*enum State
         {
             Outside,
             InCountries,
             InPlayerCountry,
             FoundHuman,
-        }
+        }*/
 
         public static Dictionary<string, List<string>> ReadSaveGame(string filePath)
         {
@@ -53,17 +55,7 @@ namespace EU4_RPC
 
                 while ((line = reader.ReadLine()) != null && linesScanned <= maxLinesScanned)
                 {
-					if (string.IsNullOrWhiteSpace(line)) continue;
-
-					if (line.IndexOf("key=\"longest_reign\"", StringComparison.Ordinal) >= 0)
-					{
-                        string next = reader.ReadLine()?.Trim();
-                        if (next != null && next.StartsWith("localization="))
-                        {
-                            string kingName = next.Split('=')[1].Trim().Trim('"');
-                            gameData["king_name"].Add(kingName);
-                        }
-                    }
+                    if (string.IsNullOrWhiteSpace(line)) continue;
 
                     if (line.Contains("="))
                     {
@@ -83,124 +75,102 @@ namespace EU4_RPC
                     linesScanned++;
                 }
 
-                #endregion
+				#endregion
 
-                string playerTag = gameData["player"][0];
-                
-                #region government rank
-                State state = State.Outside;
-                startPosition = reader.BaseStream.Length * 1 / 4;
-                reader.BaseStream.Seek(startPosition, SeekOrigin.Begin);
-                reader.DiscardBufferedData();
+				string playerTag = gameData["player"].FirstOrDefault() ?? "";
 
-                while ((line = reader.ReadLine()) != null)
-                { 
-					string trimmedLine = line.Trim();
+				#region government rank and king
+				reader.BaseStream.Seek(reader.BaseStream.Length / 4, SeekOrigin.Begin);
+				reader.DiscardBufferedData();
 
-				    switch (state)
-                    {
-                        case State.Outside:
-                            if (line.StartsWith("countries={"))
-                                state = State.InCountries;
-                            break;
+                bool inPlayerCountry = false;
+                string lastMonarchName = "";
 
-                        case State.InCountries:
-							if (trimmedLine.StartsWith(playerTag + "={"))
-								state = State.InPlayerCountry;
-                            break;
+				while ((line = reader.ReadLine()) != null)
+				{
+					linesScanned++;
+					string tline = line.Trim();
 
-                        case State.InPlayerCountry:
-							if (trimmedLine.Contains("human=yes"))
-								state = State.FoundHuman;
-
-							if (trimmedLine == "}") state = State.InCountries;
-							break;
-
-						case State.FoundHuman:
-							if (trimmedLine.StartsWith("government_rank="))
-							{
-								var parts = trimmedLine.Split('=');
-								if (parts.Length > 1 && int.TryParse(parts[1], out int rankNum))
-                                {
-                                    string rank = ((GovernmentRank)rankNum).ToString();
-                                    gameData["government_rank"].Add(rank);
-                                    goto Done;
-                                }
-                            }
-
-							if (trimmedLine == "}") state = State.InCountries;
-							break;
+					if (!inPlayerCountry)
+					{
+						if (tline.StartsWith(playerTag + "={"))
+						{
+							string next = reader.ReadLine()?.Trim();
+							if (next != null && next == "human=yes") inPlayerCountry = true;
+						}
+						continue;
 					}
 
-                    linesScanned++;
-                }
+					if (tline.StartsWith("government_rank="))
+					{
+						if (int.TryParse(tline.Split('=')[1], out int rank))
+							gameData["government_rank"].Add(((GovernmentRank)rank).ToString());
+					}
+					else if (tline.StartsWith("name=\""))
+					{
+						lastMonarchName = tline.Split('"')[1];
+					}
+					else if (tline == "flags={") // Safe exit
+					{
+						break;
+					}
+				}
 
-                Done:;
-                #endregion
+				if (!string.IsNullOrEmpty(lastMonarchName))
+					gameData["king_name"].Add(lastMonarchName);
 
-                #region active wars
-                startPosition = reader.BaseStream.Length * 3 / 4;
+				#endregion
+
+				#region active wars
+				startPosition = reader.BaseStream.Length * 3 / 4;
                 reader.BaseStream.Seek(startPosition, SeekOrigin.Begin);
                 reader.DiscardBufferedData();
 
                 bool inActiveWar = false;
-                List<string> blockLines = new();
+
+				var attackers = new List<string>();
+				var defenders = new List<string>();
+
 
                 while ((line = reader.ReadLine()) != null)
                 {
-                    if(line.Contains("active_war={", StringComparison.Ordinal))
-                    {
-                        inActiveWar = true;
-                        blockLines.Clear();
+					linesScanned++;
+                    string tline = line.Trim();
+
+					if (line.StartsWith("previous_war")) 
+                        break;
+
+					if (line.StartsWith("active_war={"))
+					{
+						inActiveWar = true;
+                        attackers.Clear(); 
+                        defenders.Clear(); 
                         continue;
-                    }
+					}
 
-                    if (inActiveWar)
-                    {
-						if (line.Trim().StartsWith("battle={")) // end of at war countries list
+					if (inActiveWar)
+					{
+						if (tline.StartsWith("add_attacker=")) attackers.Add(tline.Split('"')[1]);
+						if (tline.StartsWith("add_defender=")) defenders.Add(tline.Split('"')[1]);
+
+						if (attackers.Count > 0 && defenders.Count > 0)
 						{
-                            inActiveWar = false;
+							//inActiveWar = false;
+							if (attackers.Contains(playerTag) || defenders.Contains(playerTag))
+							{
+								string enemy = attackers.Contains(playerTag) ? defenders.FirstOrDefault() : attackers.FirstOrDefault();
+								if (enemy != null)
+								{
+									string enemyName = CountriesTags.CountryTagsToNames.GetValueOrDefault(enemy, enemy);
+									if (!gameData["at_war"].Contains(enemyName))
+										gameData["at_war"].Add(enemyName);
+								}
+							}
+						}
+					}
 
-                            var attackers = new List<string>();
-                            var defenders = new List<string>();
+				}
 
-                            foreach (var l in blockLines)
-                            {
-                                if (l.StartsWith("add_attacker="))
-                                {
-                                    var parts = l.Split('"');
-                                    if(parts.Length > 1) attackers.Add(parts[1]);
-                                }
-                                else if (l.StartsWith("add_defender="))
-                                {
-                                    var parts = l.Split('"');
-                                    if(parts.Length > 1) defenders.Add(parts[1]);
-                                }
-                            }
-
-                            if (attackers.Contains(playerTag) || defenders.Contains(playerTag))
-                            {
-                                string enemyTag = attackers.Contains(playerTag) ? defenders.FirstOrDefault() : attackers.FirstOrDefault();
-                                if (enemyTag != null)
-                                {
-                                    if (!CountriesTags.CountryTagsToNames.TryGetValue(enemyTag, out var enemyName))
-                                        enemyName = enemyTag;
-
-                                    gameData["at_war"].Add(enemyName);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            blockLines.Add(line);
-                        }
-
-                        if (line.StartsWith("previous_war"))
-                            break;
-                    }
-
-                    linesScanned++;
-                }
                 #endregion
             }
 

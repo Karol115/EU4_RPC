@@ -38,8 +38,6 @@ namespace EU4_RPC
                 discord = null;
                 //Thread.Sleep(10000);
             }
-
-            //UpdateDiscordPresence(Program.saveGameDict);
         }
 
         public bool UpdateDiscordPresence(Dictionary<string, List<string>> gameData)
@@ -63,16 +61,17 @@ namespace EU4_RPC
                 string countryName = GetValue("displayed_country_name", "Unknown Country");
                 string age = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(GetValue("current_age"));
                 string ruler = GetValue("king_name", "Unknown Ruler");
-                string governmentRank = !string.IsNullOrEmpty(GetValue("government_rank")) ? (" " + GetValue("government_rank") + " of") : "";
+                string governmentRank = !string.IsNullOrEmpty(GetValue("government_rank")) ? (GetValue("government_rank") + " of") : "";
 
-                string atWarDisplay = "";
+                string warInfo = "";
                 if (gameData.ContainsKey("at_war") && gameData["at_war"].Count > 0)
                 {
-                    var count = gameData["at_war"].Count;
-                    var enemy = gameData["at_war"][0];
-                    var others = count > 1 ? $" + {count - 1}" : "";
-                    atWarDisplay = $" | ⚔️ {enemy} {others}";
-                }
+					var enemy = gameData["at_war"][0];
+					var others = gameData["at_war"].Count > 1 ? $" +{gameData["at_war"].Count - 1}" : "";
+					warInfo = $" at war with: {enemy}{others}";
+				}
+
+				string detailsText = $"{governmentRank} {countryName}{warInfo} | Year: {date} | {age} | {ruler}";
 
 				string playerTag = GetValue("player");
                 string flagAsset = CountriesWithFlag.Contains(playerTag) ? playerTag : "eu4_logo-512";
@@ -83,7 +82,7 @@ namespace EU4_RPC
 
 					State = "By Karol115",
 
-					Details = $"{governmentRank} {countryName} {atWarDisplay}| Year: {date} | {age} | {ruler}",
+					Details = detailsText,
 
 					Timestamps = { Start = startTimestamp },
 
