@@ -13,51 +13,53 @@ namespace EU4_RPC
         public RPC()
         {
             startTimestamp = DateTimeOffset.Now.ToUnixTimeSeconds();
-            Initialize();
         }
 
         public void Initialize()
         {
             if (discord != null) return;
 
-            try
+			try
             {
                 discord = new Discord.Discord(clientId, (UInt64)Discord.CreateFlags.NoRequireDiscord);
 
-                /*discord.SetLogHook(Discord.LogLevel.Error, (level, message) =>
-                {
-                    Console.WriteLine($"Discord Error: {message}");
-                });*/
-
-                UpdateDiscordPresence(Program.saveGameDict);
-
-            }
+			}
             catch (Discord.ResultException)
             {
-                Console.WriteLine("Discord client not detected #2. Retrying in 10 seconds...");
-                discord = null;
-                //Thread.Sleep(10000);
+				Console.ForegroundColor = ConsoleColor.DarkMagenta;
+				Console.WriteLine("Discord client not detected #2. Retrying in 10 seconds...");
+				Console.ResetColor();
+				discord = null;
             }
         }
 
         public bool UpdateDiscordPresence(Dictionary<string, List<string>> gameData)
         {
-            try
+			if (gameData == null) return false;
+
+			try
             {
                 if (discord == null)
                 {
-                    Console.WriteLine("Discord client not detected #3");
-                    return false;
+					Console.ForegroundColor = ConsoleColor.DarkMagenta;
+					Console.WriteLine("Discord client not detected #3");
+					Console.ResetColor();
+					return false;
                 }
                 var activityManager = discord.GetActivityManager();
-                if (activityManager == null)
-                    return false;
+                if (activityManager == null) return false;
 
-                //prepare info
-                string GetValue(string key, string def = "") =>
-                    (gameData.ContainsKey(key) && gameData[key].Count > 0) ? gameData[key][0] : def;
+				//prepare info
+				string GetValue(string key, string def = "")
+				{
+					if (gameData != null && gameData.TryGetValue(key, out var list) && list.Count > 0)
+					{
+						return list[0] ?? def;
+					}
+					return def;
+				}
 
-                string date = DateTime.TryParse(GetValue("date"), out var d) ? d.ToString("yyyy") : "Unknown Date";
+				string date = DateTime.TryParse(GetValue("date"), out var d) ? d.ToString("yyyy") : "Unknown Date";
                 string countryName = GetValue("displayed_country_name", "Unknown Country");
                 string age = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(GetValue("current_age"));
                 string ruler = GetValue("king_name", "Unknown Ruler");
@@ -99,21 +101,30 @@ namespace EU4_RPC
                 {
                     if (result == Discord.Result.Ok)
                     {
-                        Console.WriteLine("response");
-                    }
+						Console.ForegroundColor = ConsoleColor.Green;
+						Console.WriteLine("Updated Discord presence");
+						Console.ResetColor();
+					}
                     else
                     {
-                        Console.WriteLine("could't response\n" + result);
-                    }
+						Console.ForegroundColor = ConsoleColor.Red;
+						Console.WriteLine("Updating Discord presence failed: \n" + result);
+						Console.ResetColor();
+					}
                 });
+
+                discord.RunCallbacks();
 
                 Console.WriteLine(activity.Details);
                 return true;
             }
             catch (Exception)
             {
-                Console.WriteLine("Discord client not detected #4");
-                return false;
+				Console.ForegroundColor = ConsoleColor.DarkMagenta;
+				Console.WriteLine("Discord client not detected #4");
+				Console.ResetColor();
+
+				return false;
             }
         }
 

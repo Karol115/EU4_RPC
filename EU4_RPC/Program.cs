@@ -1,27 +1,18 @@
 ﻿using AboutConsoleDLL;
-using System.Diagnostics.Metrics;
-using System.Security.Authentication.ExtendedProtection;
 
 namespace EU4_RPC
 {
     internal class Program
     {
-        /*public static string DecompressFile(string filePath)
-        {
-            using (FileStream originalFileStream = File.OpenRead(filePath))
-            using (MemoryStream decompressedStream = new MemoryStream())
-            {
-                using (DeflateStream decompressionStream = new DeflateStream(originalFileStream, CompressionMode.Decompress))
-                {
-                    decompressionStream.CopyTo(decompressedStream);
-                }
-                return System.Text.Encoding.UTF8.GetString(decompressedStream.ToArray());
-            }
-        }*/
+		public static string saveGamePath = Path.Combine(
+			Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+			"Paradox Interactive",
+			"Europa Universalis IV",
+			"Save games"
+		);
 
-        public static string saveGamePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Paradox Interactive/Europa Universalis IV/Save games/");
-        private static string autosaveFilePath = Path.Combine(saveGamePath, "autosave.eu4");
-        public static Dictionary<string, List<string>> saveGameDict;
+        private static string? saveFilePath;
+		public static Dictionary<string, List<string>> saveGameDict;
         private static FileSystemWatcher fileWatcher;
         private static RPC rpc;
 
@@ -34,77 +25,119 @@ namespace EU4_RPC
         {
             About.ShowAbout(System.Reflection.Assembly.GetExecutingAssembly());
 
-            try
+			System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
+			try
             {
-                saveGameDict = GetGameInfo.ReadSaveGame(autosaveFilePath);
+				if (!Directory.Exists(saveGamePath))
+					Directory.CreateDirectory(saveGamePath);
+
+				var directory = new DirectoryInfo(saveGamePath);
+				saveFilePath = directory.GetFiles("*.eu4")
+					.OrderByDescending(f => f.LastWriteTime)
+					.FirstOrDefault()?.FullName;
+
+				if (!string.IsNullOrEmpty(saveFilePath) && File.Exists(saveFilePath))
+                {
+                    saveGameDict = GetGameInfo.ReadSaveGame(saveFilePath);
+                }
+                else
+                {
+					Console.ForegroundColor = ConsoleColor.DarkYellow;
+					Console.WriteLine("No save files found. Waiting for game save...");
+					Console.ResetColor();
+				}
+
                 rpc = new RPC();
 
                 fileWatcher = new FileSystemWatcher(saveGamePath);
 
-                fileWatcher.Filter = "autosave.eu4";
+                fileWatcher.Filter = "*.eu4";
                 fileWatcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName;
                 fileWatcher.Changed += OnSaveChanged;
                 fileWatcher.Created += OnSaveChanged;
                 fileWatcher.Renamed += OnSaveChanged;
                 fileWatcher.EnableRaisingEvents = true;
-
-                /*foreach (var item in saveGameDict)
-                {
-                    foreach (var i in item.Value)
-                    {
-                        Console.WriteLine(item.Key + ": " + i);
-                    }
-                }*/
             }
             catch (Exception e)
             {
-                Console.WriteLine("Main: " + e);
+				Console.ForegroundColor = ConsoleColor.DarkRed;
+				Console.WriteLine("Main: " + e);
+                Console.ResetColor();
             }
 
-			int counter = 0;
 			while (true)
             {
                 if (rpc.discord != null)
                 {
                     try
                     {
-                        rpc.discord?.RunCallbacks();
-                    }
+                        rpc.discord.RunCallbacks();
+					}
                     catch (Exception)
                     {
-                        Console.WriteLine("Discord client not detected #1. Retrying in 10 seconds...");
-                        rpc.discord.Dispose();
+						Console.ForegroundColor = ConsoleColor.DarkMagenta;
+						Console.WriteLine("Discord client not detected #1. Retrying in 10 seconds...");
+						Console.ResetColor();
+
+						rpc.discord.Dispose();
                         rpc.discord = null;
                     }
-                } 
+					Thread.Sleep(1000);
+				} 
                 else
                 {
-					if (counter % 100 == 0) rpc.Initialize();
+					rpc.Initialize();
+					if (rpc.discord != null)
+					{
+						if (saveGameDict != null) rpc.UpdateDiscordPresence(saveGameDict);
+                        Thread.Sleep(1000);
+						continue;
+					}
+					Thread.Sleep(10000);
 				}
-
-                counter++;
-                Thread.Sleep(100);
             }
         }
 
         private static void OnSaveChanged(object sender, FileSystemEventArgs e)
         {
-            Console.WriteLine($"File {e.Name} changed. Updating...");
-            attempts = 0;
+			var directory = new DirectoryInfo(saveGamePath);
+			var latestFile = directory.EnumerateFiles("*.eu4")
+                .Where(f => f.Length > 0)
+				.OrderByDescending(f => f.LastWriteTime)
+				.FirstOrDefault();
+
+			if (latestFile == null) return;
+
+            saveFilePath = latestFile.FullName;
+			attempts = 0;
 
             debounceTimer ??= new Timer(_ =>
             {
-                try
+				if (!File.Exists(saveFilePath)) return;
+
+				Console.ForegroundColor = ConsoleColor.Yellow;
+				Console.WriteLine($"File {saveFilePath} changed. Updating...");
+				Console.ResetColor();
+
+				try
                 {
-                    Console.WriteLine("Updating Discord presence...");
-                    rpc.UpdateDiscordPresence(GetGameInfo.ReadSaveGame(autosaveFilePath));
+					Console.ForegroundColor = ConsoleColor.Green;
+					Console.WriteLine("Updating Discord presence...");
+					Console.ResetColor();
+
+					rpc.UpdateDiscordPresence(GetGameInfo.ReadSaveGame(saveFilePath));
                     debounceTimer.Change(Timeout.Infinite, Timeout.Infinite);
                 }
                 catch (IOException ex)
                 {
                     attempts++;
-                    Console.WriteLine("Error reading file: " + ex.Message);
-                    if (attempts < maxAttempts)
+
+					Console.ForegroundColor = ConsoleColor.Red;
+					Console.WriteLine("Error reading file: " + ex.Message);
+					Console.ResetColor();
+
+					if (attempts < maxAttempts)
                     {
                         debounceTimer.Change(delayMs, Timeout.Infinite);
                     }
@@ -117,6 +150,5 @@ namespace EU4_RPC
 
             debounceTimer.Change(500, Timeout.Infinite);
         }
-
     }
 }
