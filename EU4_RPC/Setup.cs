@@ -52,7 +52,6 @@ namespace EU4_RPC
 
 		public static void SetupWizard()
 		{
-			Console.Clear();
 			Console.ForegroundColor = ConsoleColor.Cyan;
 			Console.WriteLine("=== EU4 RPC: First Configuration ===");
 			Console.ResetColor();
