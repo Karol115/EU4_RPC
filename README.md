@@ -2,8 +2,8 @@
 
 Works with **all versions** of EU4 (Steam, Epic Games, etc.).  
 This is a separate app, so you need to launch it when starting EU4.
-For more autmatication use **build-in bat+shortcut generator** or create a `.bat` file to launch both apps (example below).  
-Closes automatically when EU4 is closed.
+To simplify the launch process use **build-in bat+shortcut generator** or create a `.bat` file to launch both apps (example below).  
+App closes automatically when EU4 is closed.
 
 ## .bat example
 
