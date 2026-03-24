@@ -69,7 +69,10 @@ namespace EU4_RPC
                 if (gameData.ContainsKey("at_war") && gameData["at_war"].Count > 0)
                 {
 					var enemy = gameData["at_war"][0];
-					var others = gameData["at_war"].Count > 1 ? $" +{gameData["at_war"].Count - 1}" : "";
+                    int othersCount = 0;
+                    int.TryParse(gameData["at_war_others_count"].FirstOrDefault(), out othersCount);
+
+					var others = (othersCount > 0) ? (othersCount > 1 ? $" + {othersCount} others" : $" + 1 other") : "";
 					warInfo = $" at war with: {enemy}{others}";
 				}
 

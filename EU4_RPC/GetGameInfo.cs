@@ -1,6 +1,4 @@
 ﻿using System.IO.Compression;
-using System.Net.Http.Headers;
-using System.Reflection.Metadata;
 
 namespace EU4_RPC
 {
@@ -25,7 +23,8 @@ namespace EU4_RPC
                 ["king_name"] = new(),
                 ["government_rank"] = new(),
                 ["at_war"] = new(),
-            };
+				["at_war_others_count"] = new(),
+			};
 
 			try
 			{
@@ -63,7 +62,7 @@ namespace EU4_RPC
 			catch(Exception ex)
 			{
 				Console.ForegroundColor = ConsoleColor.Red;
-				Console.WriteLine("Error: " + ex.Message);
+				Console.WriteLine($"[Parser Error] Could not read {Path.GetFileName(filePath)}: {ex.Message}");
 				Console.ResetColor();
 			}
             
@@ -85,18 +84,23 @@ namespace EU4_RPC
 
 				string monarchTempName = "";
 				string dynastyTempName = "";
-			
+
+				// wars
 				bool inActiveWar = false;
 
 				var attackers = new List<string>();
 				var defenders = new List<string>();
+
+#if DEBUG
+				int linesToDraw = 0;
+#endif
 
 				while ((line = reader.ReadLine()) != null)
 				{
 					linesScanned++;
 
 					string tline = line.Trim();
-					if (tline.Length < 3) continue;
+					//if (tline.Length < 3) continue;
 
 					// main info
 					if (tline.Contains("="))
@@ -143,7 +147,7 @@ namespace EU4_RPC
 						else if (inPlayerCountry)
 						{
 							// monarch
-							if (tline == "monarch={")
+							if (tline == "monarch={" || tline == "monarch_heir={" || tline == "monarch_consort={")
 							{
 								inMonarchBlock = true;
 								monarchBlockDepth = 1;
@@ -153,16 +157,25 @@ namespace EU4_RPC
 							}
 							else if (inMonarchBlock)
 							{
-								if (tline.Contains("{") && !tline.Contains("}")) monarchBlockDepth++;
-								if (tline.Contains("}") && !tline.Contains("{")) monarchBlockDepth--;
+								int opens = tline.Count(f => f == '{');
+								int closes = tline.Count(f => f == '}');
+								monarchBlockDepth += (opens - closes);
 
-								if (monarchBlockDepth <= 1)
+#if DEBUG
+								if (linesToDraw < 50)
+								{
+									Console.WriteLine(monarchBlockDepth + " : " + tline);
+									linesToDraw++;
+								}
+#endif
+
+								if (monarchBlockDepth <= 0)
 								{
 									inMonarchBlock = false;
 								}
 								else
 								{
-									if (monarchBlockDepth == 2)
+									if (monarchBlockDepth == 1)
 									{
 										if (tline.StartsWith("name=\""))
 										{
@@ -172,7 +185,9 @@ namespace EU4_RPC
 										{
 											dynastyTempName = tline.Split('"')[1];
 										}
-										else if (tline == "country=\"" + playerTag + "\"")
+										//else if (tline == "country=\"" + playerTag + "\"")
+										//else if (tline.StartsWith("claim="))
+										else if (tline.StartsWith("succeeded=yes"))
 										{
 											string fullName = monarchTempName;
 											if (!string.IsNullOrEmpty(dynastyTempName)) fullName += " " + dynastyTempName;
@@ -187,7 +202,7 @@ namespace EU4_RPC
 							{
 								gameData["government_rank"].Add(((GovernmentRank)int.Parse(tline.Split('=')[1])).ToString());
 							}
-							else if (tline == "}")
+							else if (tline.Contains("government_rank="))
 							{
 								inPlayerCountry = false;
 							}
@@ -218,15 +233,43 @@ namespace EU4_RPC
 
 		private static void ProcessWar(List<string> attackers, List<string> defenders, string playerTag, Dictionary<string, List<string>> gameData)
 		{
-			if (attackers.Contains(playerTag) || defenders.Contains(playerTag))
+			bool isAttacker = attackers.Contains(playerTag);
+			bool isDefender = defenders.Contains(playerTag);
+
+			if (isAttacker || isDefender)
 			{
-				string enemy = attackers.Contains(playerTag) ? defenders.FirstOrDefault() : attackers.FirstOrDefault();
-				if (enemy != null)
+				var enemies = isAttacker ? defenders : attackers;
+				if (enemies.Count > 0)
 				{
-					string name = CountriesTags.CountryTagsToNames.GetValueOrDefault(enemy, enemy);
-					if (!gameData["at_war"].Contains(name)) gameData["at_war"].Add(name);
+					if (gameData["at_war"].Count == 0)
+					{
+						string leaderTag = enemies[0];
+						string leaderName = CountriesTags.CountryTagsToNames.GetValueOrDefault(leaderTag, leaderTag);
+						gameData["at_war"].Add(leaderName);
+
+						int othersInThisWar = enemies.Count - 1;
+						UpdateOthersCount(gameData, othersInThisWar);
+					}
+					else
+					{
+						UpdateOthersCount(gameData, enemies.Count);
+					}
 				}
 			}
+		}
+
+		private static void UpdateOthersCount(Dictionary<string, List<string>> gameData, int countToAdd)
+		{
+			if (countToAdd <= 0) return;
+
+			int currentTotal = 0;
+			if (gameData["at_war_others_count"].Count > 0)
+			{
+				int.TryParse(gameData["at_war_others_count"][0], out currentTotal);
+			}
+
+			gameData["at_war_others_count"].Clear();
+			gameData["at_war_others_count"].Add((currentTotal + countToAdd).ToString());
 		}
 	}
 }
