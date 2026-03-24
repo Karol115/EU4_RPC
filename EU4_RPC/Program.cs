@@ -30,6 +30,18 @@ namespace EU4_RPC
 
 			try
 			{
+				if (args.Length >= 2 && args[0] == "--launch-game")
+				{
+					string gamePath = args[1];
+					if (File.Exists(gamePath))
+					{
+						Process.Start(new ProcessStartInfo(gamePath) { UseShellExecute = true });
+					}
+				}
+
+				Setup.CheckForSetup(args);
+
+
 				if (!Directory.Exists(saveGamePath))
 					Directory.CreateDirectory(saveGamePath);
 
