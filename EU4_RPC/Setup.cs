@@ -48,6 +48,8 @@ namespace EU4_RPC
 				if (i % 10 == 0 && i > 0) Console.Write(".");
 			}
 			Console.WriteLine("\nSkipping setup...");
+
+			Console.WriteLine();
 		}
 
 		public static void SetupWizard()
