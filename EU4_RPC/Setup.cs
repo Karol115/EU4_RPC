@@ -35,12 +35,17 @@ namespace EU4_RPC
 			{
 				if (Console.KeyAvailable)
 				{
-					var key = Console.ReadKey(true).KeyChar;
-					if (char.ToLower(key) == 'c')
+					var keyInfo = Console.ReadKey(intercept: true);
+					if (keyInfo.Key == ConsoleKey.C)
 					{
 						Console.WriteLine("\nStarting Setup...");
 						SetupWizard();
 						Environment.Exit(0);
+						return;
+					}
+					else if (keyInfo.Key == ConsoleKey.Enter)
+					{
+						Console.WriteLine();
 						return;
 					}
 				}

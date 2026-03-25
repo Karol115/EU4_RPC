@@ -17,7 +17,7 @@ namespace EU4_RPC
 		private static FileSystemWatcher fileWatcher;
 		private static RPC rpc;
 
-		private static Timer debounceTimer;
+		private static System.Threading.Timer debounceTimer;
 		private static int attempts = 0;
 		const int maxAttempts = 20;
 		const int delayMs = 2000;
@@ -144,7 +144,7 @@ namespace EU4_RPC
 			saveFilePath = file.FullName;
 			attempts = 0;
 
-			debounceTimer ??= new Timer(_ =>
+			debounceTimer ??= new System.Threading.Timer(_ =>
 			{
 				if (!File.Exists(saveFilePath)) return;
 
