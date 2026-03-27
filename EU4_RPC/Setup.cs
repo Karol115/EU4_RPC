@@ -60,9 +60,10 @@ namespace EU4_RPC
 		public static void SetupWizard()
 		{
 			Console.ForegroundColor = ConsoleColor.Cyan;
-			Console.WriteLine("=== EU4 RPC: First Configuration ===");
+			Console.WriteLine("=== EU4 RPC: Configurator ===");
 			Console.ResetColor();
-			Console.WriteLine("\nNow Program will prepare .bat for you. This file will launch your eu4 and this rpc. Run game to let the program work");
+			Console.WriteLine("\nNow I will prepare .bat and shortcut for you. This bat file will launch your eu4 and rpc at once.");
+			Console.WriteLine("Please launch Europa Universalis IV now to start auto configuration.");
 
 			Process? eu4Process = null;
 			while (eu4Process == null)
@@ -106,6 +107,7 @@ namespace EU4_RPC
 				Console.WriteLine("[2/2] Desktop shortcut created with the original EU4 icon!");
 				Console.ResetColor();
 				Console.WriteLine($"Setup complete! Now you can use the '{lnkName}' shortcut on your desktop. Enjoy playing");
+				Console.WriteLine($"Press any key to exit");
 
 			}
 			catch (Exception ex)

@@ -41,9 +41,9 @@ namespace EU4_RPC
             {
                 if (discord == null)
                 {
-					Console.ForegroundColor = ConsoleColor.DarkMagenta;
-					Console.WriteLine("Discord client not detected #3");
-					Console.ResetColor();
+					//Console.ForegroundColor = ConsoleColor.DarkMagenta;
+					//Console.WriteLine("Discord client not detected #3");
+					//Console.ResetColor();
 					return false;
                 }
                 var activityManager = discord.GetActivityManager();

@@ -17,6 +17,7 @@ namespace EU4_RPC
 		private static FileSystemWatcher fileWatcher;
 		private static RPC rpc;
 
+		private static bool isReady = false;
 		private static System.Threading.Timer debounceTimer;
 		private static int attempts = 0;
 		const int maxAttempts = 20;
@@ -27,6 +28,10 @@ namespace EU4_RPC
 			About.ShowAbout(System.Reflection.Assembly.GetExecutingAssembly());
 
 			System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
+			#if DEBUG
+				isReady = true;
+			#endif
 
 			try
 			{
@@ -77,18 +82,53 @@ namespace EU4_RPC
 				Console.ResetColor();
 			}
 
+
+#if !DEBUG
+			DateTime startTime = DateTime.Now;
+			int gracePeriodSeconds = 30;
+#endif
+
 			while (true)
 			{
 #if !DEBUG
 				var eu4Processes = Process.GetProcessesByName("eu4");
 				if (eu4Processes.Length == 0)
 				{
-					Console.ForegroundColor = ConsoleColor.DarkBlue;
-					Console.WriteLine("EU4 is not running. Closing RPC...");
-					Console.ResetColor();
+					if (isReady) 
+					{
+						isReady = false;
+						gracePeriodSeconds = 5;
+						startTime = DateTime.Now;
+						Console.WriteLine("\nEU4 closed. Waiting 5s to exit");
+					}
 
-					Thread.Sleep(1000);
-					Environment.Exit(0);
+					double elapsed = (DateTime.Now - startTime).TotalSeconds;
+
+					if (elapsed > gracePeriodSeconds)
+					{
+						Console.ForegroundColor = ConsoleColor.DarkBlue;
+						Console.WriteLine("\nEU4 is not running. Closing RPC...");
+						Console.ResetColor();
+
+						Thread.Sleep(1000);
+						Environment.Exit(0);
+					}
+					else
+					{
+						Console.Write($"\rWaiting for EU4 to start RPC... ({gracePeriodSeconds - (int)elapsed}s left)    ");
+						Thread.Sleep(1000);
+						continue;
+					}
+				} else {
+					if (!isReady) 
+					{
+						Console.WriteLine();
+						Console.ForegroundColor = ConsoleColor.Green;
+						Console.WriteLine("EU4 detected! RPC sync is now active.");
+						Console.ResetColor();
+						isReady = true;
+						gracePeriodSeconds = 30;
+					}
 				}
 #endif
 
@@ -112,7 +152,7 @@ namespace EU4_RPC
 				else
 				{
 					rpc.Initialize();
-					if (rpc.discord != null)
+					if (rpc != null && rpc.discord != null)
 					{
 						TriggerUpdate();
 					}
@@ -128,6 +168,8 @@ namespace EU4_RPC
 
 		private static void TriggerUpdate(FileInfo? file = null)
 		{
+			if (!isReady) return;
+
 			if (file == null)
 			{
 				var directory = new DirectoryInfo(saveGamePath);
