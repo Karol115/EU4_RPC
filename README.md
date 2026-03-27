@@ -5,9 +5,9 @@ This is a separate app, so you need to launch it when starting EU4.
 To simplify the launch process use **build-in bat+shortcut generator** or create a `.bat` file to launch both apps (example below).  
 App closes automatically when EU4 is closed.
 
-# Manual Bat & Shortcut
+## Manual Bat & Shortcut
 
-## .bat example
+### .bat example
 
 ```bat
 @echo off
