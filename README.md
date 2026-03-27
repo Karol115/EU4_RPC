@@ -15,5 +15,5 @@ start "" "{eu4_path}"
 start "" "{eu4-RPC_path}"
 ```
 
-When you are creating bat file manually this can be useful: create shortcut to .bat and change icon(Original exe shortcut->Change Icon->copy path and paste to shortcut icon for .bat).
+This can be useful: create shortcut to .bat and change icon(Original exe shortcut->Change Icon->copy path and paste to shortcut icon for .bat).
 Done!!!
