@@ -5,6 +5,8 @@ This is a separate app, so you need to launch it when starting EU4.
 To simplify the launch process use **build-in bat+shortcut generator** or create a `.bat` file to launch both apps (example below).  
 App closes automatically when EU4 is closed.
 
+# Manual Bat & Shortcut
+
 ## .bat example
 
 ```bat
@@ -13,6 +15,5 @@ start "" "{eu4_path}"
 start "" "{eu4-RPC_path}"
 ```
 
-## Optional
 When you are creating bat file manually this can be useful: create shortcut to .bat and change icon(Original exe shortcut->Change Icon->copy path and paste to shortcut icon for .bat).
 Done!!!
