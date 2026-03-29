@@ -43,9 +43,9 @@ namespace EU4_RPC
 						Process.Start(new ProcessStartInfo(gamePath) { UseShellExecute = true });
 					}
 				}
-
+#if !DEBUG
 				Setup.CheckForSetup(args);
-
+#endif
 
 				if (!Directory.Exists(saveGamePath))
 					Directory.CreateDirectory(saveGamePath);
@@ -106,12 +106,12 @@ namespace EU4_RPC
 
 					if (elapsed > gracePeriodSeconds)
 					{
-						Console.ForegroundColor = ConsoleColor.DarkBlue;
+						Console.ForegroundColor = ConsoleColor.Blue;
 						Console.WriteLine("\nEU4 is not running. Closing RPC...");
 						Console.ResetColor();
 
-						Thread.Sleep(1000);
-						Environment.Exit(0);
+						Thread.Sleep(2000);
+						return;
 					}
 					else
 					{
@@ -152,11 +152,15 @@ namespace EU4_RPC
 				else
 				{
 					rpc.Initialize();
-					if (rpc != null && rpc.discord != null)
+					if (rpc.discord != null)
 					{
 						TriggerUpdate();
 					}
-					Thread.Sleep(10000);
+					else
+					{
+						Thread.Sleep(10000);
+						continue;
+					}
 				}
 			}
 		}
@@ -205,7 +209,8 @@ namespace EU4_RPC
 					Console.WriteLine("Updating Discord presence...");
 					Console.ResetColor();
 
-					rpc.UpdateDiscordPresence(GetGameInfo.ReadSaveGame(saveFilePath));
+					if (rpc.discord != null)
+						rpc.UpdateDiscordPresence(GetGameInfo.ReadSaveGame(saveFilePath));
 					debounceTimer.Change(Timeout.Infinite, Timeout.Infinite);
 				}
 				catch (IOException ex)

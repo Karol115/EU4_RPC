@@ -106,9 +106,13 @@ namespace EU4_RPC
 				Console.ForegroundColor = ConsoleColor.Green;
 				Console.WriteLine("[2/2] Desktop shortcut created with the original EU4 icon!");
 				Console.ResetColor();
-				Console.WriteLine($"Setup complete! Now you can use the '{lnkName}' shortcut on your desktop. Enjoy playing");
-				Console.WriteLine($"Press any key to exit");
-
+				Console.ForegroundColor = ConsoleColor.DarkGreen;
+				Console.WriteLine("Setup complete! Now you can use the");
+				Console.WriteLine(lnkName);
+				Console.ForegroundColor = ConsoleColor.Green;
+				Console.WriteLine("shortcut on your desktop. Enjoy playing");
+				Console.ResetColor();
+				Console.WriteLine($"Press any key to exit ...");
 			}
 			catch (Exception ex)
 			{

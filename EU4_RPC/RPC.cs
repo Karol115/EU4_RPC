@@ -62,10 +62,13 @@ namespace EU4_RPC
 				string date = DateTime.TryParse(GetValue("date"), out var d) ? d.ToString("yyyy") : "Unknown Date";
                 string countryName = GetValue("displayed_country_name", "Unknown Country");
                 string age = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(GetValue("current_age"));
-                string ruler = GetValue("king_name", "Unknown Ruler");
                 string governmentRank = !string.IsNullOrEmpty(GetValue("government_rank")) ? (GetValue("government_rank") + " of") : "";
 
-                string warInfo = "";
+				string ruler = GetValue("king_name", "Unknown Ruler");
+				bool isRegency = GetValue("is_regency").ToLower() == "true";
+                string rulerIcon = "";// isRegency ? "📜" : "👑";
+
+				string warInfo = "";
                 if (gameData.ContainsKey("at_war") && gameData["at_war"].Count > 0)
                 {
 					var enemy = gameData["at_war"][0];
@@ -73,28 +76,30 @@ namespace EU4_RPC
                     int.TryParse(gameData["at_war_others_count"].FirstOrDefault(), out othersCount);
 
 					var others = (othersCount > 0) ? (othersCount > 1 ? $" + {othersCount} others" : $" + 1 other") : "";
-					warInfo = $" at war with: {enemy}{others}";
+					warInfo = $" ⚔️ at war with: {enemy}{others}";
 				}
 
-				string detailsText = $"{governmentRank} {countryName}{warInfo} | Year: {date} | {age} | {ruler}";
+				string detailsText = $"{governmentRank} {countryName}{warInfo} | Year: {date} | {age} | {rulerIcon}{ruler}";
+
+				if (detailsText.Length > 128)
+				{
+					detailsText = detailsText.Substring(0, 125) + "...";
+				}
 
 				string playerTag = GetValue("player");
-                string flagAsset = CountriesWithFlag.Contains(playerTag) ? playerTag : "eu4_logo-512";
+                string flagAsset = CountriesWithFlag.Contains(playerTag) ? playerTag.ToLower() : "";
 
 				var activity = new Discord.Activity
                 {
 					Type = ActivityType.Playing,
-
 					State = "By Karol115",
-
 					Details = detailsText,
-
 					Timestamps = { Start = startTimestamp },
 
 					Assets =
                     {
                         LargeImage = "eu4_logo-512",
-                        //SmallImage = flagAsset,
+                        SmallImage = flagAsset,
                         LargeText = countryName,
 						SmallText = "Europa Universalis IV"
 					}
@@ -134,19 +139,22 @@ namespace EU4_RPC
         private readonly HashSet<string> CountriesWithFlag = new()
         {
             // --- EUROPE ---
-			"ARA", "AUT", "BAV", "BOH", "BRA", "BUR", "BYZ", "CAS", "DAN", "ENG",
+			"ARA", "BAV", "BOH", "BRA", "BUR", "BYZ", "CAS", "DAN", "ENG",
 	        "FRA", "GBR", "GER", "HAB", "HLR", "HUN", "ITA", "LAN", "LIT", "LVA",
 	        "MLO", "MOS", "NAP", "NED", "NOR", "NOV", "PAP", "PLC", "POL", "POR",
-	        "PRU", "ROM", "RUS", "SAX", "SCO", "SPA", "SWE", "TEU",
+	        "PRU", "ROM", "RUS", "SAX", "SCO", "SPA", "SWE", "TEU", "VEN", "GEN", 
+            "TUS", "SWI", "SAV", "KRA", "GRE", "SER", "CRO", "KNI", "IRE", "TTS",
+			
 
             // --- ASIA ---
-            "BAH", "DLH", "JAP", "MNG", "MUG", "PER", "QNG", "TIM", "VIJ",
+            "BAH", "DLH", "JAP", "MNG", "MUG", "PER", "QNG", "TIM", "VIJ", "KOR",
+            "AYU", "GOL", "YUA", "QOM", "JNP", "QAR", "AKK", "OIR", "CSH", "MGE",
 
             // --- AFRICA ---
-            "ADU", "EGY", "ETH", "MAM", "MOR", "TUN",
+            "ADU", "EGY", "ETH", "MAM", "MOR", "TUN", "ZAN", "MAL", "SON",
 
             // --- AMERICA ---
-            "BRZ", "CAN", "USA",
+            "BRZ", "CAN", "USA", "AZT", "INC", "MEX", "COL", "KUB",
 
             // --- OTHER ---
             "TUR"

@@ -21,6 +21,7 @@ namespace EU4_RPC
                 ["displayed_country_name"] = new(),
                 ["current_age"] = new(),
                 ["king_name"] = new(),
+				["is_regency"] = new(),
                 ["government_rank"] = new(),
                 ["at_war"] = new(),
 				["at_war_others_count"] = new(),
@@ -79,6 +80,7 @@ namespace EU4_RPC
 				string playerTag = gameData["player"].FirstOrDefault() ?? "";
 				bool inCountriesSection = false;
 				bool inPlayerCountry = false;
+				int playerCountryDepth = 0;
 				bool inMonarchBlock = false;
 				int monarchBlockDepth = 0;
 
@@ -87,7 +89,6 @@ namespace EU4_RPC
 
 				// wars
 				bool inActiveWar = false;
-
 				var attackers = new List<string>();
 				var defenders = new List<string>();
 
@@ -100,7 +101,7 @@ namespace EU4_RPC
 					linesScanned++;
 
 					string tline = line.Trim();
-					//if (tline.Length < 3) continue;
+					if (string.IsNullOrEmpty(line)) continue;
 
 					// main info
 					if (tline.Contains("="))
@@ -130,106 +131,115 @@ namespace EU4_RPC
 						}
 					}
 
+
 					if (onlyMeta) continue;
 
-					// gov & ruler
+					// Country Start & End
 					if (tline == "countries={") { inCountriesSection = true; continue; }
+					if (inCountriesSection && tline == "provinces={") { inCountriesSection = false; continue; }
+					if (!inCountriesSection) continue;
 
-					if (inCountriesSection && tline == "provinces={") { inCountriesSection = false; break; }
-
-					if (inCountriesSection && !string.IsNullOrEmpty(playerTag))
+					// Player Tag
+					if (!inPlayerCountry)
 					{
-						if (!inPlayerCountry && tline.StartsWith(playerTag + "={"))
+						if (tline.StartsWith(playerTag + "={"))
 						{
 							string next = reader.ReadLine()?.Trim();
-							if (next != null && next == "human=yes") inPlayerCountry = true;
+							if (next == "human=yes") { inPlayerCountry = true; playerCountryDepth = 1; }
 						}
-						else if (inPlayerCountry)
+						continue;
+					}
+
+					if (inPlayerCountry)
+					{
+						// Country Navigation
+						int cOpens = tline.Count(f => f == '{');
+						int cCloses = tline.Count(f => f == '}');
+						playerCountryDepth += (cOpens - cCloses);
+
+						// Monarch
+						if (inMonarchBlock)
 						{
-							// monarch
-							if (tline == "monarch={" || tline == "monarch_heir={" || tline == "monarch_consort={")
-							{
-								inMonarchBlock = true;
-								monarchBlockDepth = 1;
-								monarchTempName = "";
-								dynastyTempName = "";
-								continue;
-							}
-							else if (inMonarchBlock)
-							{
-								int opens = tline.Count(f => f == '{');
-								int closes = tline.Count(f => f == '}');
-								monarchBlockDepth += (opens - closes);
-
-#if DEBUG
-								if (linesToDraw < 50)
-								{
-									Console.WriteLine(monarchBlockDepth + " : " + tline);
-									linesToDraw++;
-								}
-#endif
-
-								if (monarchBlockDepth <= 0)
-								{
-									inMonarchBlock = false;
-								}
-								else
-								{
-									if (monarchBlockDepth == 1)
-									{
-										if (tline.StartsWith("name=\""))
-										{
-											monarchTempName = tline.Split('"')[1];
-										}
-										else if (tline.StartsWith("dynasty=\""))
-										{
-											dynastyTempName = tline.Split('"')[1];
-										}
-										//else if (tline == "country=\"" + playerTag + "\"")
-										//else if (tline.StartsWith("claim="))
-										else if (tline.StartsWith("succeeded=yes"))
-										{
-											string fullName = monarchTempName;
-											if (!string.IsNullOrEmpty(dynastyTempName)) fullName += " " + dynastyTempName;
-
-											gameData["king_name"].Clear();
-											gameData["king_name"].Add(fullName);
-										}
-									}
-								}
-							}
-							else if (tline.StartsWith("government_rank="))
-							{
-								gameData["government_rank"].Add(((GovernmentRank)int.Parse(tline.Split('=')[1])).ToString());
-							}
-							else if (tline.Contains("government_rank="))
-							{
-								inPlayerCountry = false;
-							}
+							HandleMonarchLine(tline, ref monarchBlockDepth, ref monarchTempName, ref dynastyTempName, gameData);
+							if (monarchBlockDepth <= 0) inMonarchBlock = false;
 						}
 
-						// wars
-						if (tline.StartsWith("active_war={"))
+						// Monarch & Gov
+						if (tline.StartsWith("monarch={") || tline.StartsWith("monarch_heir={") || tline.StartsWith("monarch_consort={"))
 						{
-							inActiveWar = true;
-							attackers.Clear();
-							defenders.Clear();
-						}
-						else if (inActiveWar)
-						{
-							if (tline.StartsWith("add_attacker=")) attackers.Add(tline.Split('"')[1]);
-							else if (tline.StartsWith("add_defender=")) defenders.Add(tline.Split('"')[1]);
-							else if (tline == "}")
+							// regency
+							if (tline.StartsWith("monarch_consort={"))
 							{
-								inActiveWar = false;
-								ProcessWar(attackers, defenders, playerTag, gameData);
+								gameData["is_regency"].Clear();
+								gameData["is_regency"].Add("true");
 							}
+							else
+							{
+								gameData["is_regency"].Clear();
+								gameData["is_regency"].Add("false");
+							}
+
+							inMonarchBlock = true;
+							monarchBlockDepth = 1;
+							monarchTempName = ""; dynastyTempName = "";
+						}
+						else if (tline.StartsWith("government_rank="))
+						{
+							gameData["government_rank"].Clear();
+							gameData["government_rank"].Add(((GovernmentRank)int.Parse(tline.Split('=')[1])).ToString());
+						}
+
+						if (playerCountryDepth <= 0 || tline.StartsWith("government_reform_progress="))
+						{
+							inPlayerCountry = false;
+							playerCountryDepth = 0;
+						}
+
+						continue;
+					}
+
+					// wars
+					if (tline.StartsWith("active_war={"))
+					{
+						inActiveWar = true;
+						attackers.Clear();
+						defenders.Clear();
+					}
+					else if (inActiveWar)
+					{
+						if (tline.StartsWith("add_attacker=")) attackers.Add(tline.Split('"')[1]);
+						else if (tline.StartsWith("add_defender=")) defenders.Add(tline.Split('"')[1]);
+						else if (tline == "}")
+						{
+							inActiveWar = false;
+							ProcessWar(attackers, defenders, playerTag, gameData);
 						}
 					}
 				}
 			}
 		}
 
+		private static void HandleMonarchLine(string tline, ref int depth, ref string name, ref string dynasty, Dictionary<string, List<string>> gameData)
+		{
+			int opens = tline.Count(f => f == '{');
+			int closes = tline.Count(f => f == '}');
+			depth += (opens - closes);
+
+			if(depth == 1)
+			{
+#if DEBUG
+				Console.WriteLine($"{depth} : {tline}");
+#endif
+				if (tline.StartsWith("name=\"")) name = tline.Split('"')[1];
+				else if (tline.StartsWith("dynasty=\"")) dynasty = tline.Split('"')[1];
+				else if(tline.StartsWith("succeeded=yes"))
+				{
+					string fullName = string.IsNullOrEmpty(dynasty) ? name : $"{name} {dynasty}";
+					gameData["king_name"].Clear();
+					gameData["king_name"].Add(fullName);
+				}
+			}
+		}
 
 		private static void ProcessWar(List<string> attackers, List<string> defenders, string playerTag, Dictionary<string, List<string>> gameData)
 		{
