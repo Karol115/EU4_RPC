@@ -25,7 +25,7 @@ namespace EU4_RPC
 
 		static void Main(string[] args)
 		{
-			About.ShowAbout(System.Reflection.Assembly.GetExecutingAssembly());
+			About.ShowAbout(System.Reflection.Assembly.GetExecutingAssembly(), 16);
 
 			System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
 
