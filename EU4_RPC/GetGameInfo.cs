@@ -70,11 +70,11 @@ namespace EU4_RPC
             return gameData;
         }
 
-		static string line;
-		static string tline;
+		static string line = "";
+		static string tline = "";
 		static int linesScanned = 0;
 
-		static string playerTag;
+		static string playerTag = "";
 
 		static bool inCountriesSection = false;
 
@@ -100,10 +100,6 @@ namespace EU4_RPC
 			using var reader = new StreamReader(stream, System.Text.Encoding.GetEncoding(1252));
 
 			playerTag = gameData["player"].FirstOrDefault() ?? "";
-
-#if DEBUG
-			int linesToDraw = 0;
-#endif
 
 			while ((line = reader.ReadLine()) != null)
 			{
