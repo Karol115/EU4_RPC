@@ -70,178 +70,217 @@ namespace EU4_RPC
             return gameData;
         }
 
+		static string line;
+		static string tline;
+		static int linesScanned = 0;
+
+		static string playerTag;
+
+		static bool inCountriesSection = false;
+
+		static bool inPlayerCountry = false;
+		static int playerCountryDepth = 0;
+
+		static bool inMonarchBlock = false;
+		static int monarchBlockDepth = 0;
+
+		static string monarchTempName = "";
+		static string dynastyTempName = "";
+
+		// wars
+		static bool inActiveWar = false;
+		static List<string> attackers = new List<string>();
+		static List<string> defenders = new List<string>();
+		static int warBlockDepth = 0;
+
 		private static void ParseStream(Stream stream, Dictionary<string, List<string>> gameData, bool onlyMeta = false)
 		{
-			int linesScanned = 0;
+			linesScanned = 0;
+			inCountriesSection = false;
+			inPlayerCountry = false;
+			playerCountryDepth = 0;
+			inMonarchBlock = false;
+			monarchBlockDepth = 0;
+			inActiveWar = false;
+			attackers.Clear();
+			defenders.Clear();
+			warBlockDepth = 0;
+			monarchTempName = "";
+			dynastyTempName = "";
 
-			using (StreamReader reader = new StreamReader(stream, System.Text.Encoding.GetEncoding(1252)))
+
+			using var reader = new StreamReader(stream, System.Text.Encoding.GetEncoding(1252));
+
+			playerTag = gameData["player"].FirstOrDefault() ?? "";
+#if DEBUG
+			int linesToDraw = 0;
+#endif
+
+			while ((line = reader.ReadLine()) != null)
 			{
-				string line;
-				string playerTag = gameData["player"].FirstOrDefault() ?? "";
-				bool inCountriesSection = false;
-				bool inPlayerCountry = false;
-				int playerCountryDepth = 0;
-				bool inMonarchBlock = false;
-				int monarchBlockDepth = 0;
+				linesScanned++;
 
-				string monarchTempName = "";
-				string dynastyTempName = "";
+				tline = line.Trim();
+				if (string.IsNullOrEmpty(line)) continue;
+
+				// main info
+				if (tline.Contains("="))
+				{
+					var parts = tline.Split('=', 2);
+					string key = parts[0].Trim();
+					if (key == "date" || key == "player" || key == "current_age")
+					{
+						string val = parts[1].Trim().Trim('"').Replace("_", " ");
+						if (gameData[key].Count == 0)
+						{
+							Set(gameData, key, val);
+							if (key == "player")
+							{
+								playerTag = val;
+								Set(gameData, "displayed_country_name", CountriesTags.CountryTagsToNames.GetValueOrDefault(val, val));
+							}
+						}
+
+						if (onlyMeta && gameData["date"].Count > 0 && gameData["player"].Count > 0)
+						{
+							if (linesScanned > 100) return;
+						}
+					}
+				}
+
+
+				if (onlyMeta) continue;
+
+				// Country Start & End
+				if (tline == "countries={") { inCountriesSection = true; continue; }
+				if (inCountriesSection && tline == "provinces={") { inCountriesSection = false; continue; }
+				//if (!inCountriesSection) continue;
+
+				// Player Tag
+				if (inCountriesSection && !inPlayerCountry)
+				{
+					if (tline.StartsWith(playerTag + "={"))
+					{
+						string next = reader.ReadLine()?.Trim();
+						if (next == "human=yes") { inPlayerCountry = true; playerCountryDepth = 1; }
+					}
+					//continue;
+				}
+
+				if (inPlayerCountry)
+				{
+					// Country Navigation
+					playerCountryDepth += GetDepthChange(tline);
+
+					// Monarch
+					if (inMonarchBlock)
+					{
+						HandleMonarchLine(gameData);
+						if (monarchBlockDepth <= 0) inMonarchBlock = false;
+					}
+
+					// Monarch & Gov
+					/*if (tline.StartsWith("monarch={") || tline.StartsWith("monarch_heir={") || tline.StartsWith("monarch_consort={"))
+					{
+						// regency
+						if (tline.StartsWith("monarch_consort={"))
+						{
+							Set(gameData, "is_regency", "true");
+						}
+						else
+						{
+							Set(gameData, "is_regency", "false");
+						}
+
+						inMonarchBlock = true;
+						monarchBlockDepth = 1;
+						monarchTempName = ""; dynastyTempName = "";
+					}*/
+					if(tline.StartsWith("monarch") && tline.EndsWith("{"))
+					{
+						Set(gameData, "is_regency", tline.Contains("consort") ? "true" : "false");
+						inMonarchBlock = true;
+						monarchBlockDepth = 1;
+						monarchTempName = "";
+						dynastyTempName = "";
+					}
+					else if (tline.StartsWith("government_rank="))
+					{
+						var rank = (GovernmentRank)int.Parse(tline.Split('=')[1]);
+						Set(gameData, "government_rank", rank.ToString());
+					}
+
+					if (playerCountryDepth <= 0 || tline.StartsWith("government_reform_progress="))
+					{
+						inPlayerCountry = false;
+						playerCountryDepth = 0;
+					}
+
+					continue;
+				}
 
 				// wars
-				bool inActiveWar = false;
-				var attackers = new List<string>();
-				var defenders = new List<string>();
-
-#if DEBUG
-				int linesToDraw = 0;
-#endif
-
-				while ((line = reader.ReadLine()) != null)
+				if (tline.StartsWith("active_war={"))
 				{
-					linesScanned++;
+					inActiveWar = true;
+					warBlockDepth = 1;
+					attackers.Clear();
+					defenders.Clear();
+				}
+				else if (inActiveWar)
+				{
+					warBlockDepth += GetDepthChange(tline);
 
-					string tline = line.Trim();
-					if (string.IsNullOrEmpty(line)) continue;
-
-					// main info
-					if (tline.Contains("="))
-					{
-						var parts = tline.Split('=', 2);
-						string key = parts[0].Trim();
-						if (key == "date" || key == "player" || key == "current_age")
-						{
-							string val = parts[1].Trim().Trim('"').Replace("_", " ");
-							if (gameData[key].Count == 0)
-							{
-								gameData[key].Add(val);
-								if (key == "player")
-								{
-									playerTag = val;
-
-									string countryName = CountriesTags.CountryTagsToNames.GetValueOrDefault(val);
-									gameData["displayed_country_name"].Clear();
-									gameData["displayed_country_name"].Add(countryName);
-								}
-							}
-
-							if (onlyMeta && gameData["date"].Count > 0 && gameData["player"].Count > 0)
-							{
-								if (linesScanned > 100) return;
-							}
-						}
-					}
-
-
-					if (onlyMeta) continue;
-
-					// Country Start & End
-					if (tline == "countries={") { inCountriesSection = true; continue; }
-					if (inCountriesSection && tline == "provinces={") { inCountriesSection = false; continue; }
-					if (!inCountriesSection) continue;
-
-					// Player Tag
-					if (!inPlayerCountry)
-					{
-						if (tline.StartsWith(playerTag + "={"))
-						{
-							string next = reader.ReadLine()?.Trim();
-							if (next == "human=yes") { inPlayerCountry = true; playerCountryDepth = 1; }
-						}
-						continue;
-					}
-
-					if (inPlayerCountry)
-					{
-						// Country Navigation
-						int cOpens = tline.Count(f => f == '{');
-						int cCloses = tline.Count(f => f == '}');
-						playerCountryDepth += (cOpens - cCloses);
-
-						// Monarch
-						if (inMonarchBlock)
-						{
-							HandleMonarchLine(tline, ref monarchBlockDepth, ref monarchTempName, ref dynastyTempName, gameData);
-							if (monarchBlockDepth <= 0) inMonarchBlock = false;
-						}
-
-						// Monarch & Gov
-						if (tline.StartsWith("monarch={") || tline.StartsWith("monarch_heir={") || tline.StartsWith("monarch_consort={"))
-						{
-							// regency
-							if (tline.StartsWith("monarch_consort={"))
-							{
-								gameData["is_regency"].Clear();
-								gameData["is_regency"].Add("true");
-							}
-							else
-							{
-								gameData["is_regency"].Clear();
-								gameData["is_regency"].Add("false");
-							}
-
-							inMonarchBlock = true;
-							monarchBlockDepth = 1;
-							monarchTempName = ""; dynastyTempName = "";
-						}
-						else if (tline.StartsWith("government_rank="))
-						{
-							gameData["government_rank"].Clear();
-							gameData["government_rank"].Add(((GovernmentRank)int.Parse(tline.Split('=')[1])).ToString());
-						}
-
-						if (playerCountryDepth <= 0 || tline.StartsWith("government_reform_progress="))
-						{
-							inPlayerCountry = false;
-							playerCountryDepth = 0;
-						}
-
-						continue;
-					}
-
-					// wars
-					if (tline.StartsWith("active_war={"))
-					{
-						inActiveWar = true;
-						attackers.Clear();
-						defenders.Clear();
-					}
-					else if (inActiveWar)
-					{
-						if (tline.StartsWith("add_attacker=")) attackers.Add(tline.Split('"')[1]);
-						else if (tline.StartsWith("add_defender=")) defenders.Add(tline.Split('"')[1]);
-						else if (tline == "}")
-						{
-							inActiveWar = false;
-							ProcessWar(attackers, defenders, playerTag, gameData);
-						}
-					}
+					CheckForActiveWars(gameData);
+					continue;
 				}
 			}
 		}
+		
 
-		private static void HandleMonarchLine(string tline, ref int depth, ref string name, ref string dynasty, Dictionary<string, List<string>> gameData)
+		private static void Set(Dictionary<string, List<string>> dict, string key, string val)
 		{
-			int opens = tline.Count(f => f == '{');
-			int closes = tline.Count(f => f == '}');
-			depth += (opens - closes);
+			if (!dict.ContainsKey(key)) return;
+			dict[key].Clear();
+			dict[key].Add(val);
+		}
 
-			if(depth == 1)
+		private static int GetDepthChange(string line)
+		{
+			return line.Count(f => f == '{') - line.Count(f => f == '}');
+		}
+
+		private static void HandleMonarchLine(Dictionary<string, List<string>> gameData)
+		{
+			monarchBlockDepth += GetDepthChange(tline);
+
+			if (monarchBlockDepth == 1)
 			{
 #if DEBUG
-				Console.WriteLine($"{depth} : {tline}");
+				Console.WriteLine($"{monarchBlockDepth} : {tline}");
 #endif
-				if (tline.StartsWith("name=\"")) name = tline.Split('"')[1];
-				else if (tline.StartsWith("dynasty=\"")) dynasty = tline.Split('"')[1];
+				if (tline.StartsWith("name=\"")) monarchTempName = tline.Split('"')[1];
+				else if (tline.StartsWith("dynasty=\"")) dynastyTempName = tline.Split('"')[1];
 				else if(tline.StartsWith("succeeded=yes"))
 				{
-					string fullName = string.IsNullOrEmpty(dynasty) ? name : $"{name} {dynasty}";
-					gameData["king_name"].Clear();
-					gameData["king_name"].Add(fullName);
+					string fullName = string.IsNullOrEmpty(dynastyTempName) ? monarchTempName : $"{monarchTempName} {dynastyTempName}";
+					Set(gameData, "king_name", fullName);
 				}
 			}
 		}
 
-		private static void ProcessWar(List<string> attackers, List<string> defenders, string playerTag, Dictionary<string, List<string>> gameData)
+		private static void CheckForActiveWars(Dictionary<string, List<string>> gameData)
+		{
+			if (tline.StartsWith("add_attacker=")) attackers.Add(tline.Split('"')[1]);
+			else if (tline.StartsWith("add_defender=")) defenders.Add(tline.Split('"')[1]);
+			else if (warBlockDepth <= 0)
+			{
+				inActiveWar = false;
+				ProcessWar(gameData);
+			}
+		}
+
+		private static void ProcessWar(Dictionary<string, List<string>> gameData)
 		{
 			bool isAttacker = attackers.Contains(playerTag);
 			bool isDefender = defenders.Contains(playerTag);
