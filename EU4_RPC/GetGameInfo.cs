@@ -95,23 +95,12 @@ namespace EU4_RPC
 
 		private static void ParseStream(Stream stream, Dictionary<string, List<string>> gameData, bool onlyMeta = false)
 		{
-			linesScanned = 0;
-			inCountriesSection = false;
-			inPlayerCountry = false;
-			playerCountryDepth = 0;
-			inMonarchBlock = false;
-			monarchBlockDepth = 0;
-			inActiveWar = false;
-			attackers.Clear();
-			defenders.Clear();
-			warBlockDepth = 0;
-			monarchTempName = "";
-			dynastyTempName = "";
-
+			ResetValues();
 
 			using var reader = new StreamReader(stream, System.Text.Encoding.GetEncoding(1252));
 
 			playerTag = gameData["player"].FirstOrDefault() ?? "";
+
 #if DEBUG
 			int linesToDraw = 0;
 #endif
@@ -154,7 +143,6 @@ namespace EU4_RPC
 				// Country Start & End
 				if (tline == "countries={") { inCountriesSection = true; continue; }
 				if (inCountriesSection && tline == "provinces={") { inCountriesSection = false; continue; }
-				//if (!inCountriesSection) continue;
 
 				// Player Tag
 				if (inCountriesSection && !inPlayerCountry)
@@ -180,22 +168,6 @@ namespace EU4_RPC
 					}
 
 					// Monarch & Gov
-					/*if (tline.StartsWith("monarch={") || tline.StartsWith("monarch_heir={") || tline.StartsWith("monarch_consort={"))
-					{
-						// regency
-						if (tline.StartsWith("monarch_consort={"))
-						{
-							Set(gameData, "is_regency", "true");
-						}
-						else
-						{
-							Set(gameData, "is_regency", "false");
-						}
-
-						inMonarchBlock = true;
-						monarchBlockDepth = 1;
-						monarchTempName = ""; dynastyTempName = "";
-					}*/
 					if(tline.StartsWith("monarch") && tline.EndsWith("{"))
 					{
 						Set(gameData, "is_regency", tline.Contains("consort") ? "true" : "false");
@@ -248,6 +220,22 @@ namespace EU4_RPC
 		private static int GetDepthChange(string line)
 		{
 			return line.Count(f => f == '{') - line.Count(f => f == '}');
+		}
+
+		private static void ResetValues()
+		{
+			linesScanned = 0;
+			inCountriesSection = false;
+			inPlayerCountry = false;
+			playerCountryDepth = 0;
+			inMonarchBlock = false;
+			monarchBlockDepth = 0;
+			inActiveWar = false;
+			attackers.Clear();
+			defenders.Clear();
+			warBlockDepth = 0;
+			monarchTempName = "";
+			dynastyTempName = "";
 		}
 
 		private static void HandleMonarchLine(Dictionary<string, List<string>> gameData)
@@ -317,8 +305,7 @@ namespace EU4_RPC
 				int.TryParse(gameData["at_war_others_count"][0], out currentTotal);
 			}
 
-			gameData["at_war_others_count"].Clear();
-			gameData["at_war_others_count"].Add((currentTotal + countToAdd).ToString());
+			Set(gameData, "at_war_others_count", (currentTotal + countToAdd).ToString());
 		}
 	}
 }
